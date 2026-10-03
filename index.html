@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Cube</title>
+</head>
+
+<body>
+    <canvas id="c"></canvas>
+</body>
+<script>
+    let ctx = c.getContext("2d")
+
+    let rotationX = 0
+    let rotationY = 0
+    let speedX = 0.5
+    let speedY = 0.8
+    let pulseScale = 1
+    let baseHue = 200 // base color
+
+    // geometry
+    const vertices = []
+    for (let i = 0; i < 8; i++) {
+        vertices.push([
+            i & 1 ? 1 : -1,
+            i & 2 ? 1 : -1,
+            i & 4 ? 1 : -1,
+        ])
+    }
+
+    const edges = []
+    for (let i = 0; i < 8; i++) {
+        for (let bit = 1; bit < 8; bit <<= 1) {
+            if (!(i & bit)) edges.push([i, i | bit])
+        }
+    }
+
+    let audioCtx, droneOsc, droneFilter, droneGain
+
+    function startAudio() {
+        if (audioCtx) return // audio has been started already
+
+        audioCtx = new AudioContext()
+
+        droneOsc = audioCtx.createOscillator()
+        droneOsc.type = "sawtooth"
+
+        droneFilter = audioCtx.createBiquadFilter()
+        droneGain.gain.value = 0.06
+
+        droneOsc.connect(droneFilter)
+        droneFilter.connect(droneGain)
+        droneGain.connect(audioCtx.destination)
+        droneOsc.start()
+    }
+
+    function playBlip(frequency) {
+        if (!audioCtx) return
+
+        const osc = audioCtx.createOscillator()
+        const gain = audioCtx.createGain()
+        const now = audioCtx.currentTime
+
+        osc.frequency.value = frequency
+        osc.connect(gain)
+        gain.connect(audioCtx.destination)
+
+        gain.gain.setValueAtTime(0.2, now)
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3)
+
+        osc.start()
+        osc.stop(now + 0.3)
+    }
+
+    // mouse input stuff
+    onpointermove = (e) => {
+        const mouseY = e.clientY / innerHeight
+        const mouseX = e.clientX / innerWidth
+
+        speedY = (mouseX - 0.5) * 5
+        speedX = (mouseY - 0.5) * 5
+
+        if (audioCtx) {
+            droneOsc.frequency.value = 80 + (1 - mouseY) * 400
+            droneFilter.frequency.value = 200 + mouseX * 3000
+        }
+    }
+
+    onpointerdown = () => {
+        startAudio()
+        playBlip(200 + Math.random() * 600)
+        pulseScale = 1.6
+        baseHue = Math.random() * 360
+    }
+
+    function project(point, scale) {
+        let [x, y, z] = point.map((n) => n * scale)
+
+        const cosY = Math.cos(rotationY)
+        const sinY = Math.sin(rotationY) //yeah, Math!! so fun
+
+        ;[x, z] = [x * cosY - z * sinY, x * sinY + z * cosY]
+
+        const cosX = Math.cos(rotationX)
+        const sinX = Math.sin(rotationX)
+
+        ;[y, z] = [y * cosX - z * sinX, y * sinX + z * cosX]
+
+        const perspective = 4 / (z + 5)
+
+        const unit = c.height / 6
+
+        return [
+            c.width / 2 + x * perspective * unit,
+            c.height / 2 + y * perspective * unit
+        ]
+    }
+
+    function draw() {
+        ctx.fillStyle = "rgba(0,0,0, 0.2)"
+        ctx.fillRect(0, 0, c.width, c.height)
+
+        ctx.lineWidth = 2
+
+        // big cube (scale 1), smaler/inside cube (0.5 scale)
+        const scales = [1, 0.5]
+        scales.forEach((scale, index) => {
+            ctx.strokeStyle = `hsl(${baseHue + index * 120}, 90%, 60%)`
+            ctx.beginPath()
+            edges.forEach(([from, to]) =>{
+                ctx.moveTo(...project(vertices[from], scale * pulseScale))
+                ctx.lineTo(...project(vertices[to], scale * pulseScale))
+            })      
+            ctx.stroke()      
+        })
+    }
+
+    onresize = () => {
+        c.width = innerWidth
+        c.height = innerHeight
+    }
+    onresize()
+
+    let lastTime = 0
+
+    function frame(now){
+        const dt = Math.min((now - lastTime) / 1000, 0.1)
+        lastTime = now
+
+        rotationX += speedX * dt
+        rotationY += speedY * dt
+        pulseScale += (1 - pulseScale) * 5 * dt
+
+        draw()
+        requestAnimationFrame(frame)
+    }
+
+    requestAnimationFrame(frame)
+</script>
+
+</html>
