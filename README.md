@@ -1,5 +1,5 @@
 # 3D Cube
-
+![Image](https://cdn.hackclub.com/01a137c4-ae7f-73ac-9321-e05f29a72c7b/journal-1791936998520.png)
 A wireframe 3d cube you can steer with you mouse, with sound in under 3KB of HTML (yes, it also has js)
 
 ## Controls
